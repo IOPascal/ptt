@@ -9,6 +9,7 @@ import socket
 import ssl
 import struct
 import subprocess
+import sys
 import threading
 
 from .cert import cert_fingerprint, ensure_cert
@@ -34,6 +35,90 @@ except ImportError:  # Windows has no pty/fcntl/termios
 
 DEFAULT_PORT = 8022
 AUTH_TIMEOUT = 30.0
+
+_ANSI = {
+    "reset": "\x1b[0m",
+    "bold": "\x1b[1m",
+    "red": "\x1b[31m",
+    "green": "\x1b[32m",
+    "cyan": "\x1b[36m",
+    "bright_green": "\x1b[92m",
+}
+
+
+def use_color(mode: str) -> bool:
+    """Whether to emit ANSI colors (mode: auto/always/never)."""
+    if mode == "always":
+        return True
+    if mode == "never":
+        return False
+    if os.environ.get("NO_COLOR"):
+        return False
+    return sys.stdout.isatty()
+
+
+def _paint(color: bool, code: str, text: str) -> str:
+    if not color or not code:
+        return text
+    return f"{code}{text}{_ANSI['reset']}"
+
+
+def format_banner(
+    port: int,
+    ips: list,
+    token: str,
+    fingerprint: str,
+    *,
+    color: bool,
+    unicode_box: bool,
+) -> str:
+    """Startup banner: connection info inside a (colored) frame."""
+    rows = [
+        ("PTT Host - Tunnel offen", "title"),
+        ("", None),
+        (f"Port:          {port}", None),
+    ]
+    for ip in ips:
+        rows.append((f"Connect:       python -m ptt connect {ip} --port {port}", None))
+    rows.extend(
+        [
+            (f"Token:         {token}", "token"),
+            (f"Fingerabdruck: {fingerprint}", None),
+            ("", None),
+            ("Beenden: Strg+C", None),
+        ]
+    )
+    width = max(len(text) for text, _ in rows)
+    if unicode_box:
+        tl, tr, bl, br, h, v = ("╭", "╮", "╰", "╯", "─", "│")
+    else:
+        tl, tr, bl, br, h, v = ("+", "+", "+", "+", "-", "|")
+    cyan = _ANSI["cyan"] if color else ""
+    reset = _ANSI["reset"] if color else ""
+    lines = [f"{cyan}{tl}{h * (width + 2)}{tr}{reset}"]
+    for text, kind in rows:
+        if kind == "title":
+            content = _paint(color, _ANSI["bold"], text.ljust(width))
+        elif kind == "token":
+            content = _paint(color, _ANSI["bright_green"], text.ljust(width))
+        else:
+            content = text.ljust(width)
+        lines.append(f"{cyan}{v}{reset} {content} {cyan}{v}{reset}")
+    lines.append(f"{cyan}{bl}{h * (width + 2)}{br}{reset}")
+    return "\n".join(lines)
+
+
+def print_banner(
+    port: int, ips: list, token: str, fingerprint: str, color_mode: str
+) -> bool:
+    """Print the framed banner. Returns whether colors were used."""
+    color = use_color(color_mode)
+    encoding = (sys.stdout.encoding or "").lower()
+    banner = format_banner(
+        port, ips, token, fingerprint, color=color, unicode_box="utf" in encoding
+    )
+    print(banner, flush=True)
+    return color
 
 
 def generate_token() -> str:
@@ -227,22 +312,25 @@ def _serve_pipes(conn, shell: str) -> None:
         reader.join(timeout=5)
 
 
-def _handle_connection(conn, shell: str, token: str) -> None:
+def _handle_connection(conn, shell: str, token: str, color: bool) -> None:
+    ok = _paint(color, _ANSI["green"], "[+]")
+    err = _paint(color, _ANSI["red"], "[-]")
+    info = _paint(color, _ANSI["cyan"], "[*]")
     try:
         peer = conn.getpeername()
         peer_name = f"{peer[0]}:{peer[1]}"
     except OSError:
         peer_name = "?"
-    print(f"[+] Verbindung von {peer_name}", flush=True)
+    print(f"{ok} Verbindung von {peer_name}", flush=True)
     conn.settimeout(AUTH_TIMEOUT)
     try:
         try:
             given = recv_line(conn).strip()
         except OSError:
-            print("[-] Auth-Timeout, Verbindung geschlossen.", flush=True)
+            print(f"{err} Auth-Timeout, Verbindung geschlossen.", flush=True)
             return
         if not hmac.compare_digest(given, token):
-            print(f"[-] Falsches Token von {peer_name}, abgewiesen.", flush=True)
+            print(f"{err} Falsches Token von {peer_name}, abgewiesen.", flush=True)
             try:
                 send_line(conn, "DENIED")
             except OSError:
@@ -250,14 +338,14 @@ def _handle_connection(conn, shell: str, token: str) -> None:
             return
         send_line(conn, "OK")
         conn.settimeout(None)
-        print(f"[+] Auth OK ({peer_name}), Shell startet: {shell}", flush=True)
+        print(f"{ok} Auth OK ({peer_name}), Shell startet: {shell}", flush=True)
         if HAVE_PTY:
             _serve_pty(conn, shell)
         else:
             _serve_pipes(conn, shell)
-        print(f"[*] Sitzung mit {peer_name} beendet.", flush=True)
+        print(f"{info} Sitzung mit {peer_name} beendet.", flush=True)
     except OSError as exc:
-        print(f"[-] Verbindungsfehler ({peer_name}): {exc}", flush=True)
+        print(f"{err} Verbindungsfehler ({peer_name}): {exc}", flush=True)
 
 
 def run_host(
@@ -267,6 +355,7 @@ def run_host(
     token: str | None,
     cert_dir: str,
     once: bool = False,
+    color_mode: str = "auto",
 ) -> None:
     """Open the tunnel and serve sessions until Ctrl+C (or one if ``once``)."""
     token = token or generate_token()
@@ -281,31 +370,26 @@ def run_host(
     listener.listen(5)
     actual_port = listener.getsockname()[1]
 
-    print("=== PTT Host (Tunnel offen) ===")
-    print(f"Port:          {actual_port}")
-    for ip in local_ips():
-        print(f"Connect:       python -m ptt connect {ip} --port {actual_port}")
-    print(f"Token:         {token}")
-    print(f"Fingerabdruck: {fingerprint}")
-    print("Zum Beenden: Strg+C")
-    print("==============================", flush=True)
+    color = print_banner(actual_port, local_ips(), token, fingerprint, color_mode)
 
+    err = _paint(color, _ANSI["red"], "[-]")
+    info = _paint(color, _ANSI["cyan"], "[*]")
     try:
         while True:
             try:
                 raw, _ = listener.accept()
             except OSError as exc:
-                print(f"[-] Accept-Fehler: {exc}", flush=True)
+                print(f"{err} Accept-Fehler: {exc}", flush=True)
                 continue
             try:
                 conn = context.wrap_socket(raw, server_side=True)
                 conn.do_handshake()
             except OSError as exc:
-                print(f"[-] TLS-Handshake fehlgeschlagen: {exc}", flush=True)
+                print(f"{err} TLS-Handshake fehlgeschlagen: {exc}", flush=True)
                 raw.close()
                 continue
             try:
-                _handle_connection(conn, shell, token)
+                _handle_connection(conn, shell, token, color)
             finally:
                 try:
                     conn.close()
@@ -314,6 +398,6 @@ def run_host(
             if once:
                 break
     except KeyboardInterrupt:
-        print("\n[*] Host beendet.", flush=True)
+        print(f"\n{info} Host beendet.", flush=True)
     finally:
         listener.close()

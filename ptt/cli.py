@@ -33,6 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Nach einer Sitzung beenden (Default: weiter lauschen)",
     )
+    host.add_argument(
+        "--color",
+        choices=["auto", "always", "never"],
+        default="auto",
+        help="Farbige Ausgabe (Default: auto)",
+    )
 
     connect = sub.add_parser("connect", help="Mit offenem Tunnel verbinden.")
     connect.add_argument("host", help="Adresse des PTT-Hosts")
@@ -53,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
             token=args.token,
             cert_dir=args.cert_dir or default_cert_dir(),
             once=args.once,
+            color_mode=args.color,
         )
         return 0
     return run_client(args.host, args.port, args.token)

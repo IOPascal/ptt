@@ -63,6 +63,9 @@ python3 -m ptt host --port 8022 --shell /bin/bash --token mein-token
 # Host: nach einer Sitzung automatisch beenden
 python3 -m ptt host --once
 
+# Host: Farbausgabe steuern (auto/always/never, Default: auto)
+python3 -m ptt host --color always
+
 # Client: Token direkt mitgeben (für Skripte)
 python -m ptt connect 192.168.1.42 --token 3fa2-9c1d-77b0-e4f5
 ```
