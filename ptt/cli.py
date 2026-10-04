@@ -7,6 +7,7 @@ from . import __version__
 from .cert import default_cert_dir
 from .client import run_client
 from .host import DEFAULT_PORT, default_shell, run_host
+from .update import run_update
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -46,6 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
     connect.add_argument(
         "--token", default=None, help="Token (Default: interaktiv abfragen)"
     )
+    sub.add_parser("update", help="PTT aktualisieren (git pull oder pip).")
     return parser
 
 
@@ -62,4 +64,6 @@ def main(argv: list[str] | None = None) -> int:
             color_mode=args.color,
         )
         return 0
+    if args.command == "update":
+        return run_update()
     return run_client(args.host, args.port, args.token)

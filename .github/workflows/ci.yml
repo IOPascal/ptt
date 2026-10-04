@@ -30,5 +30,13 @@ jobs:
       - name: Syntax check
         run: python -m compileall -q ptt tests
 
+      - name: Smoke-test starter script (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: ./ptt.sh --version
+
+      - name: Smoke-test starter script (Windows)
+        if: runner.os == 'Windows'
+        run: .\ptt.cmd --version
+
       - name: Run tests
         run: python -m unittest discover -s tests -v

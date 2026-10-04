@@ -23,11 +23,15 @@ Nur Python aus der Standardbibliothek nötig – keine `pip`-Pakete.
 
 ## Schnellstart
 
+Ohne Installation, direkt aus dem Projektordner
+(Linux: `./ptt.sh`, Windows: `ptt` via `ptt.cmd` –
+oder als festes Kommando [installieren](#als-ptt-kommando-installieren)):
+
 **1. Auf diesem Gerät (Host): Tunnel öffnen**
 
 ```sh
 cd ptt
-python3 -m ptt host
+./ptt.sh host
 ```
 
 Der Host zeigt dann alles, was der Client braucht:
@@ -45,7 +49,7 @@ Fingerabdruck: SHA256:AA:BB:CC:...
 
 ```bat
 cd <pfad-zum-ptt-ordner>
-py -m ptt connect 192.168.1.42
+ptt connect 192.168.1.42
 ```
 
 Token vom Host eingeben, Fingerabdruck vergleichen – fertig.
@@ -56,27 +60,48 @@ Beenden mit `exit` in der Remote-Shell.
 
 ## Optionen
 
+(`ptt` steht hier für `./ptt.sh`, `ptt.cmd` bzw. das installierte Kommando.)
+
 ```sh
 # Host: eigener Port, eigene Shell, festes Token
-python3 -m ptt host --port 8022 --shell /bin/bash --token mein-token
+ptt host --port 8022 --shell /bin/bash --token mein-token
 
 # Host: nach einer Sitzung automatisch beenden
-python3 -m ptt host --once
+ptt host --once
 
 # Host: Farbausgabe steuern (auto/always/never, Default: auto)
-python3 -m ptt host --color always
+ptt host --color always
 
 # Client: Token direkt mitgeben (für Skripte)
-python -m ptt connect 192.168.1.42 --token 3fa2-9c1d-77b0-e4f5
+ptt connect 192.168.1.42 --token 3fa2-9c1d-77b0-e4f5
+
+# PTT selbst aktualisieren
+ptt update
 ```
 
-Als installierter Befehl (optional):
+## Als `ptt`-Kommando installieren
+
+Damit `ptt` überall ohne Pfad läuft, wahlweise:
 
 ```sh
+# Variante A: Projekt-venv (empfohlen für Entwicklung)
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e .
-ptt host
-ptt connect 192.168.1.42
 ```
+
+```sh
+# Variante B: global via pipx (einmalig: pipx installieren)
+pipx install .
+```
+
+Windows (installiert `ptt.exe`):
+
+```bat
+py -m pip install .
+```
+
+Danach überall: `ptt host`, `ptt connect 192.168.1.42`, `ptt update`.
 
 ## Sicherheit
 
