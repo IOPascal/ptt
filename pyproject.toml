@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ptt-private-terminal-tunnel"
+version = "0.1.0"
+description = "PTT - Private Terminal Tunnel: terminal access over TLS in your LAN"
+readme = "README.md"
+requires-python = ">=3.9"
+
+[project.scripts]
+ptt = "ptt.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ptt*"]
