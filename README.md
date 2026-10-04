@@ -27,44 +27,53 @@ Ohne Installation, direkt aus dem Projektordner
 (Linux: `./ptt.sh`, Windows: `ptt` via `ptt.cmd` –
 oder als festes Kommando [installieren](#als-ptt-kommando-installieren)):
 
-**1. Auf diesem Gerät (Host): Tunnel öffnen**
+**1. Host: Tunnel öffnen** (z. B. auf dem Linux-Rechner)
 
 ```sh
 cd ptt
 ./ptt.sh host
 ```
 
-Der Host zeigt dann alles, was der Client braucht:
+Der Host zeigt seine PIN im Rahmen, z. B.:
 
 ```
-=== PTT Host (Tunnel offen) ===
-Port:          8022
-Connect:       python -m ptt connect 192.168.1.42 --port 8022
-Token:         3fa2-9c1d-77b0-e4f5
-Fingerabdruck: SHA256:AA:BB:CC:...
-==============================
+╭────────────────────────────────────────────────╮
+│ PTT Host - Tunnel offen                        │
+│                                                │
+│ Name:           wohnzimmer                     │
+│ PIN:            482-913                        │
+│                                                │
+│ Client:         ptt connect → wählen → PIN     │
+╰────────────────────────────────────────────────╯
 ```
 
-**2. Auf dem Windows-PC (Client): verbinden**
+**2. Client: verbinden** (z. B. auf dem Windows-PC)
 
 ```bat
 cd <pfad-zum-ptt-ordner>
-ptt connect 192.168.1.42
+ptt connect
 ```
 
-Token vom Host eingeben, Fingerabdruck vergleichen – fertig.
+`ptt connect` findet den Host von selbst – du wählst ihn aus der Liste
+und gibst die 6-stellige PIN vom Host-Bildschirm ein. Fertig.
 Beenden mit `exit` in der Remote-Shell.
 
 > Tipp: Den `ptt`-Ordner einfach per USB-Stick, Netzwerkfreigabe
-> oder `git clone` auf den Windows-PC kopieren.
+> oder `git clone` auf den anderen Rechner kopieren.
 
 ## Optionen
 
 (`ptt` steht hier für `./ptt.sh`, `ptt.cmd` bzw. das installierte Kommando.)
 
 ```sh
-# Host: eigener Port, eigene Shell, festes Token
-ptt host --port 8022 --shell /bin/bash --token mein-token
+# Host: Name im WLAN, feste PIN, eigene Shell
+ptt host --name wohnzimmer --pin 123456 --shell /bin/bash
+
+# Host: nicht im WLAN ankündigen (nur Direkt-Verbindung)
+ptt host --no-discover
+
+# Host: langes Token statt PIN (für Skripte / unsichere Netze)
+ptt host --token mein-geheimes-token
 
 # Host: nach einer Sitzung automatisch beenden
 ptt host --once
@@ -72,8 +81,11 @@ ptt host --once
 # Host: Farbausgabe steuern (auto/always/never, Default: auto)
 ptt host --color always
 
-# Client: Token direkt mitgeben (für Skripte)
-ptt connect 192.168.1.42 --token 3fa2-9c1d-77b0-e4f5
+# Client: direkt per IP (ohne Suche)
+ptt connect 192.168.1.42
+
+# Client: Secret direkt mitgeben (für Skripte)
+ptt connect 192.168.1.42 --token 482913
 
 # PTT selbst aktualisieren
 ptt update
@@ -107,18 +119,22 @@ Danach überall: `ptt host`, `ptt connect 192.168.1.42`, `ptt update`.
 
 - Jede Verbindung ist TLS-verschlüsselt (Zertifikat in `~/.ptt/`,
   wird beim ersten Start erzeugt und wiederverwendet).
-- Ohne das Token weist der Host jede Verbindung ab.
-- Beim Verbinden zeigt der Client den **Fingerabdruck** des Hosts –
-  mit der Anzeige auf dem Host vergleichen (schützt vor Geräten,
-  die sich im WLAN als der Host ausgeben).
-- Token nie in Screenshots/Chats teilen, außer mit demjenigen,
+- Standard ist die **PIN**: 6-stellig, steht nur auf dem Host-Bildschirm
+  und wird nach jeder Sitzung neu erzeugt. Nach 5 falschen Versuchen
+  sperrt der Host kurz (Schutz vor Raten).
+- Die Host-Suche per Broadcast vertraut dem lokalen Netz: Für ein
+  normales Heim-WLAN passt das. In **fremden/unsicheren Netzen**
+  lieber `--token` mit langem Geheimnis nutzen und den Fingerabdruck
+  manuell vergleichen.
+- PIN/Token nie in Screenshots/Chats teilen, außer mit demjenigen,
   der sich verbinden soll.
 
 ## Fehlerbehebung
 
 | Problem | Lösung |
 |---|---|
-| `Keine Verbindung` / Timeout | WLAN prüfen, IP im `Connect:`-Hinweis nutzen, Firewall prüfen |
+| Keine Hosts gefunden | Gleiches WLAN? Läuft `ptt host`? Firewall: UDP 8023 + TCP 8022 frei? Notfalls direkt: `ptt connect <ip>` |
+| `Keine Verbindung` / Timeout | WLAN prüfen, `Direkt:`-Zeile im Banner nutzen, Firewall prüfen |
 | Windows-Firewall blockt | Einmalig eingehende Regel für Port 8022 erlauben (nur privates Netzwerk) |
 | `openssl nicht gefunden` (Host) | `pip install cryptography` als Alternative |
 | Kauderwelsch/Umlaute falsch | Terminal auf UTF-8 stellen (Windows Terminal passt meist) |
@@ -130,9 +146,9 @@ Danach überall: `ptt host`, `ptt connect 192.168.1.42`, `ptt update`.
 python3 -m unittest discover -s tests -v
 ```
 
-## Einschränkungen (v1)
+## Einschränkungen (0.2)
 
-- Nur Terminal (kein Datei-Transfer – geplant für v2)
+- Nur Terminal (kein Datei-Transfer – geplant für später)
 - Ein Client gleichzeitig (weitere warten, bis die Sitzung endet)
 - Host auf Windows: ohne Pseudo-Terminal, daher nur einfache Befehle
   (kein `vim`/`htop`); Host auf Linux hat keine Einschränkung

@@ -40,9 +40,26 @@ def build_parser() -> argparse.ArgumentParser:
         default="auto",
         help="Farbige Ausgabe (Default: auto)",
     )
+    host.add_argument(
+        "--name", default=None, help="Anzeigename im WLAN (Default: Rechnername)"
+    )
+    host.add_argument(
+        "--pin", default=None, help="Feste PIN (Default: zufällig, rotiert)"
+    )
+    host.add_argument(
+        "--no-discover",
+        dest="discover",
+        action="store_false",
+        help="Nicht im WLAN ankündigen (nur direkt verbinden)",
+    )
 
     connect = sub.add_parser("connect", help="Mit offenem Tunnel verbinden.")
-    connect.add_argument("host", help="Adresse des PTT-Hosts")
+    connect.add_argument(
+        "host",
+        nargs="?",
+        default=None,
+        help="Adresse des PTT-Hosts (leer = im WLAN suchen)",
+    )
     connect.add_argument("--port", type=int, default=DEFAULT_PORT)
     connect.add_argument(
         "--token", default=None, help="Token (Default: interaktiv abfragen)"
@@ -52,17 +69,24 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
     if args.command == "host":
-        run_host(
-            bind=args.bind,
-            port=args.port,
-            shell=args.shell or default_shell(),
-            token=args.token,
-            cert_dir=args.cert_dir or default_cert_dir(),
-            once=args.once,
-            color_mode=args.color,
-        )
+        try:
+            run_host(
+                bind=args.bind,
+                port=args.port,
+                shell=args.shell or default_shell(),
+                token=args.token,
+                cert_dir=args.cert_dir or default_cert_dir(),
+                once=args.once,
+                color_mode=args.color,
+                name=args.name,
+                pin=args.pin,
+                discover=args.discover,
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
         return 0
     if args.command == "update":
         return run_update()

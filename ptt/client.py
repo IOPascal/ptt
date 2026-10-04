@@ -11,7 +11,9 @@ import struct
 import sys
 import threading
 
+from .auth import normalize_pin
 from .cert import peer_fingerprint
+from .discover import discover
 from .protocol import (
     FRAME_EXIT,
     FRAME_RESIZE,
@@ -205,8 +207,64 @@ def _run_windows(sock) -> int:
     return result["code"]
 
 
-def run_client(hostname: str, port: int, token: str | None) -> int:
+def pick_host(hosts: list) -> dict | None:
+    """Let the user choose one discovered host (single host = auto)."""
+    if len(hosts) == 1:
+        only = hosts[0]
+        print(f"[*] Gefunden: {only['name']} ({only['address']})")
+        return only
+    print("[*] Gefundene Hosts:")
+    for i, host in enumerate(hosts, 1):
+        print(f"  {i}) {host['name']} ({host['address']})")
+    for _ in range(3):
+        try:
+            choice = input("Nummer wählen: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return None
+        if choice.isdigit() and 1 <= int(choice) <= len(hosts):
+            return hosts[int(choice) - 1]
+        print("Ungültige Auswahl.")
+    return None
+
+
+def _prompt_pin() -> str | None:
+    for _ in range(3):
+        try:
+            raw = input("PIN vom Host-Bildschirm: ")
+        except (EOFError, KeyboardInterrupt):
+            return None
+        if 4 <= len(normalize_pin(raw)) <= 12:
+            return raw
+        print("Bitte die PIN vom Host-Bildschirm eingeben (nur Ziffern).")
+    return None
+
+
+def _prompt_hidden(prompt: str) -> str | None:
+    try:
+        return getpass.getpass(prompt)
+    except (EOFError, KeyboardInterrupt):
+        return None
+
+
+def run_client(hostname: str | None, port: int, token: str | None) -> int:
     """Connect to a host and run the interactive session. Returns exit code."""
+    expected_fp: str | None = None
+    auth_kind: str | None = None
+    if hostname is None:
+        print("[*] Suche PTT-Hosts im WLAN ...")
+        hosts = discover()
+        if not hosts:
+            print(
+                "[-] Keine PTT-Hosts gefunden. Läuft auf dem Ziel `ptt host`? "
+                "Alternativ direkt: ptt connect <ip>."
+            )
+            return 1
+        chosen = pick_host(hosts)
+        if chosen is None:
+            return 1
+        hostname, port = chosen["address"], chosen["port"]
+        expected_fp, auth_kind = chosen["fingerprint"], chosen["auth"]
     try:
         raw = socket.create_connection((hostname, port), timeout=15)
     except OSError as exc:
@@ -221,17 +279,33 @@ def run_client(hostname: str, port: int, token: str | None) -> int:
         print(f"[-] TLS-Fehler: {exc}")
         raw.close()
         return 1
-    print(f"[*] Host-Fingerabdruck: {peer_fingerprint(sock)}")
-    print("[*] Bitte mit dem Fingerabdruck auf dem Host vergleichen!")
-    if token is None:
-        try:
-            token = getpass.getpass("Token: ")
-        except (EOFError, KeyboardInterrupt):
+    peer_fp = peer_fingerprint(sock)
+    print(f"[*] Host-Fingerabdruck: {peer_fp}")
+    if expected_fp is not None:
+        if peer_fp != expected_fp:
+            print(
+                "[-] Fingerabdruck stimmt NICHT mit der Ankündigung überein - "
+                "Abbruch (Angriff möglich)."
+            )
+            sock.close()
+            return 1
+        print("[+] Fingerabdruck stimmt mit der Ankündigung überein.")
+    else:
+        print("[*] Bei Bedarf mit dem Fingerabdruck auf dem Host vergleichen.")
+    secret: str | None = token
+    if secret is None:
+        if auth_kind == "pin":
+            secret = _prompt_pin()
+        elif auth_kind == "token":
+            secret = _prompt_hidden("Token: ")
+        else:
+            secret = _prompt_hidden("PIN oder Token: ")
+        if secret is None:
             print()
             sock.close()
             return 2
     try:
-        send_line(sock, token.strip())
+        send_line(sock, secret.strip())
         answer = recv_line(sock).strip()
     except OSError as exc:
         print(f"[-] Auth fehlgeschlagen ({exc})")
