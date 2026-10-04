@@ -69,12 +69,16 @@ def _echo_and_exit(sock, marker: str):
     send_frame(sock, FRAME_STDIN, f"echo {marker}\n".encode())
     seen = b""
     exit_code = None
+    exit_sent = False
     while exit_code is None:
         ftype, payload = recv_frame(sock)
         if ftype == FRAME_STDOUT:
             seen += payload
-            if marker.encode() in seen:
+            # send exactly once: the PTY echoes `exit` back, and a second
+            # send would race the server closing the connection
+            if not exit_sent and marker.encode() in seen:
                 send_frame(sock, FRAME_STDIN, b"exit\n")
+                exit_sent = True
         elif ftype == FRAME_EXIT:
             (exit_code,) = struct.unpack("!i", payload)
     return seen, exit_code
@@ -115,12 +119,16 @@ class IntegrationTest(unittest.TestCase):
                 send_frame(sock, FRAME_STDIN, f"echo {MARKER}\n".encode())
                 seen = b""
                 exit_code = None
+                exit_sent = False
                 while exit_code is None:
                     ftype, payload = recv_frame(sock)
                     if ftype == FRAME_STDOUT:
                         seen += payload
-                        if MARKER.encode() in seen:
+                        # send exactly once: the PTY echoes `exit` back, and
+                        # a second send would race the server closing down
+                        if not exit_sent and MARKER.encode() in seen:
                             send_frame(sock, FRAME_STDIN, b"exit\n")
+                            exit_sent = True
                     elif ftype == FRAME_EXIT:
                         (exit_code,) = struct.unpack("!i", payload)
                 self.assertIn(MARKER.encode(), seen)

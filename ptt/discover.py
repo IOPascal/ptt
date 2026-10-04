@@ -56,29 +56,40 @@ def discover(
 ) -> list:
     """Broadcast discovery and collect host replies. Never raises."""
     found: dict[str, dict] = {}
+
+    def done() -> list:
+        return sorted(found.values(), key=lambda h: h["name"].lower())
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        try:
-            sock.sendto(DISCOVER_REQUEST, (target, port))
-        except OSError:
-            return []
         deadline = time.time() + timeout
+        next_send = 0.0
         while True:
             remaining = deadline - time.time()
             if remaining <= 0:
                 break
-            sock.settimeout(remaining)
+            if time.time() >= next_send:
+                # re-send: UDP is lossy, and the responder may just be starting
+                try:
+                    sock.sendto(DISCOVER_REQUEST, (target, port))
+                except OSError:
+                    return done()
+                next_send = time.time() + 0.5
+            sock.settimeout(min(remaining, max(0.01, next_send - time.time())))
             try:
                 data, addr = sock.recvfrom(4096)
+            except socket.timeout:
+                continue
             except OSError:
-                break
+                time.sleep(0.05)  # e.g. ICMP unreachable: keep listening
+                continue
             info = parse_reply(data, addr[0])
             if info is not None:
                 found[info["fingerprint"]] = info
     finally:
         sock.close()
-    return sorted(found.values(), key=lambda h: h["name"].lower())
+    return done()
 
 
 def make_reply(name: str, tcp_port: int, fingerprint: str, auth: str) -> bytes:
