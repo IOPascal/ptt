@@ -9,7 +9,7 @@ import threading
 import time
 import unittest
 
-from helpers import _free_tcp_port, wait_for_port
+from helpers import _free_tcp_port
 from ptt.cert import ensure_cert, tls_server_context
 from ptt.client import _run_get, _run_put, run_client, run_exec
 
@@ -30,12 +30,14 @@ class LegacyPeerTest(unittest.TestCase):
             self.skipTest(str(exc))
         port = _free_tcp_port()
         context = tls_server_context(cert, key)
+        ready = threading.Event()
 
         def _serve():
             srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             srv.bind(("127.0.0.1", port))
             srv.listen(5)
+            ready.set()
             try:
                 deadline = time.monotonic() + 20
                 while time.monotonic() < deadline:
@@ -77,7 +79,10 @@ class LegacyPeerTest(unittest.TestCase):
 
         worker = threading.Thread(target=_serve, daemon=True)
         worker.start()
-        wait_for_port(port)
+        # Deterministic readiness (no TCP probe: exactly one client
+        # connection per stub, no probe-vs-client ordering race).
+        if not ready.wait(timeout=10):
+            raise AssertionError("stub did not start listening")
         self._stub_worker = worker
         return port
 
@@ -128,6 +133,19 @@ class LegacyPeerTest(unittest.TestCase):
             rc = run_exec("127.0.0.1", port, "t", argv=["uptime"])
         self.assertEqual(rc, 1)
         self.assertIn("Auth fehlgeschlagen", buf.getvalue())
+
+    def test_junk_before_client_is_tolerated(self):
+        port = self._stub("DENIED")
+        junk = socket.create_connection(("127.0.0.1", port), timeout=5)
+        try:
+            junk.sendall(b"\x00\xff-garbage\r\n")
+        finally:
+            junk.close()
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = run_exec("127.0.0.1", port, "t", argv=["uptime"])
+        self.assertEqual(rc, 1)
+        self.assertIn("Zugriff verweigert", buf.getvalue())
 
     def test_exec_silent_host_times_out(self):
         port = self._stub("OK")

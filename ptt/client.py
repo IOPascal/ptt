@@ -698,7 +698,9 @@ class _TransferProgress:
         self.enabled = sys.stdout.isatty()
         self.min_interval = min_interval
         self.start = time.monotonic()
-        self.shown = 0.0
+        # Never shown: -inf, not 0.0 — monotonic() is tiny on fresh
+        # boots, and 0.0 would throttle away the first update there.
+        self.shown = float("-inf")
         self.state = (0, None)
         try:
             cols = shutil.get_terminal_size().columns

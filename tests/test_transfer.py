@@ -817,6 +817,17 @@ class ProgressTest(unittest.TestCase):
         # first update plus forced final line
         self.assertEqual(buf.getvalue().count("\r"), 2)
 
+    def test_first_update_renders_on_fresh_boot(self):
+        # Regression: shown=0.0 throttled the first update away when
+        # monotonic() was still tiny (fresh CI runners); the bar
+        # must always render its first update (CI: 1 != 2).
+        buf = io.StringIO()
+        with mock.patch("time.monotonic", return_value=100.0):
+            with contextlib.redirect_stdout(buf):
+                bar = self._tty_bar(buf, min_interval=3600)
+                bar(10, 100)
+        self.assertEqual(buf.getvalue().count("\r"), 1)
+
     def test_silent_without_tty(self):
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):

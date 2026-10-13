@@ -576,8 +576,11 @@ def _exec_args(rest: str, kind: str, secret: str) -> list[str] | None:
         argtext = rest[len(secret) + 1 :]
     if not argtext.strip():
         return None
+    # The wire format is POSIX shlex (the client always uses
+    # shlex.join), so parse POSIX on every platform: with
+    # posix=False, quotes survive literally and break argv.
     try:
-        argv = shlex.split(argtext, posix=(os.name != "nt"))
+        argv = shlex.split(argtext, posix=True)
     except ValueError:
         return None
     return argv or None

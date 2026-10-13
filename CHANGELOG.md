@@ -2,6 +2,10 @@
 
 Format: Version / Datum / Änderungen. Verhaltensänderungen sind als solche markiert.
 
+## 0.11.13
+
+- CI-Fixes (rot auf Windows/frischen Runnern/3.9): exec-Argv immer POSIX-shlex parsen (Windows verstand POSIX-Quoting falsch, Self-Test-exec Exit 1); Fortschrittsbalken rendert Erst-Update immer (`shown=-inf` statt `0.0`, frische Boots haben kleines monotonic); Future-Import für 3.9-Annotationen in `tests/test_cert.py` plus AST-Guard; Legacy-Stub-Readiness per Event statt TCP-Probe (deterministisch) plus eigenem Junk-Toleranz-Test.
+
 ## 0.11.12
 
 - CI-Fix: `License :: ...`-Classifier entfernt (setuptools≥77 verbietet ihn neben SPDX-`license`). Keine Verhaltensänderung.

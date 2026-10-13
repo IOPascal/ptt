@@ -1,4 +1,6 @@
 """Tests for certificate validation, atomic writes and permissions."""
+from __future__ import annotations
+
 import contextlib
 import datetime
 import io

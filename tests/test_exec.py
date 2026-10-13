@@ -59,6 +59,23 @@ class HelloParseTest(unittest.TestCase):
         self.assertTrue(authed)
         self.assertEqual(argv, ["echo", "ok"])
 
+    def test_exec_wire_format_is_posix_on_all_platforms(self):
+        import shlex
+
+        # Regression: the host parsed with posix=False on Windows
+        # while the client always sends shlex.join (POSIX) — quotes
+        # survived literally and broke argv (CI: self-test exec).
+        argv = [
+            "C:\\Program Files\\ptt\\py.exe",
+            "-c",
+            "print('self-ok')",
+        ]
+        authed, parsed = _parse_hello(
+            "EXEC tok " + shlex.join(argv), "token", "tok"
+        )
+        self.assertTrue(authed)
+        self.assertEqual(parsed, argv)
+
     def test_exec_wrong_secret(self):
         self.assertEqual(
             _parse_hello("EXEC nope echo ok", "token", "tok"), (False, None)

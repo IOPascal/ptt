@@ -1,4 +1,8 @@
 """Release-conformance tests (Linie 0.11.x): docs + packaging gates."""
+from __future__ import annotations
+
+import ast
+import glob
 import os
 import unittest
 
@@ -252,10 +256,72 @@ class SecurityReviewTest(unittest.TestCase):
         self.assertTrue(args.dry_run)
 
 
+class Py39AnnotationTest(unittest.TestCase):
+    def test_no_runtime_pep604_without_future_import(self):
+        # Regression (CI 3.9): `X | Y` in annotations is evaluated
+        # at def time and crashes on 3.9 without the future import.
+        offenders = []
+        paths = sorted(
+            glob.glob(os.path.join(ROOT, "ptt", "*.py"))
+            + glob.glob(os.path.join(ROOT, "tests", "*.py"))
+        )
+        self.assertTrue(paths)
+        for path in paths:
+            with open(path, encoding="utf-8") as handle:
+                tree = ast.parse(handle.read())
+            if _has_future_annotations(tree):
+                continue
+            for name in _runtime_unions(tree):
+                offenders.append(f"{path}:{name}")
+        self.assertEqual(offenders, [])
+
+
+def _has_future_annotations(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.ImportFrom)
+            and node.module == "__future__"
+            and any(a.name == "annotations" for a in node.names)
+        ):
+            return True
+    return False
+
+
+def _runtime_unions(tree: ast.AST) -> list[str]:
+    """Names of defs whose annotations use runtime `X | Y` unions."""
+    found: list[str] = []
+
+    def _uses_union(node: ast.AST | None) -> bool:
+        return node is not None and any(
+            isinstance(sub, ast.BinOp) and isinstance(sub.op, ast.BitOr)
+            for sub in ast.walk(node)
+        )
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            places = [node.returns]
+            places += [a.annotation for a in node.args.args]
+            places += [a.annotation for a in node.args.kwonlyargs]
+            if node.args.vararg:
+                places.append(node.args.vararg.annotation)
+            if node.args.kwarg:
+                places.append(node.args.kwarg.annotation)
+            if any(_uses_union(p) for p in places):
+                found.append(node.name)
+        elif isinstance(node, ast.AnnAssign):
+            if _uses_union(node.annotation):
+                found.append(f"annotation@{node.lineno}")
+    return found
+
+
 class UpgradePathTest(unittest.TestCase):
     def test_finale_changelog_covers_release_line(self):
+        from ptt import __version__
+
+        major, line, patch = __version__.split(".")
+        self.assertEqual((major, line), ("0", "11"))
         changelog = _read("CHANGELOG.md")
-        for minor in range(13):
+        for minor in range(int(patch) + 1):
             version = f"0.11.{minor}"
             with self.subTest(version=version):
                 self.assertIn(f"## {version}", changelog)
