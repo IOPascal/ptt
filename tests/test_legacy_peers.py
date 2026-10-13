@@ -8,6 +8,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 from helpers import _free_tcp_port
 from ptt.cert import ensure_cert, tls_server_context
@@ -15,6 +16,20 @@ from ptt.client import _run_get, _run_put, run_client, run_exec
 
 
 class LegacyPeerTest(unittest.TestCase):
+    def setUp(self):
+        # Isolate TOFU storage: the real ~/.ptt/known_hosts is shared
+        # with every other test in the suite, and an ephemeral-port
+        # collision with a foreign fingerprint would look like a
+        # MITM attack (flaky 1 instead of the expected outcome).
+        self._kh_tmp = tempfile.TemporaryDirectory()
+        patcher = mock.patch(
+            "ptt.known_hosts.known_hosts_path",
+            return_value=os.path.join(self._kh_tmp.name, "known_hosts"),
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(self._kh_tmp.cleanup)
+
     def _stub(self, answer):
         """TLS stub answering ``answer`` to the hello (None = close).
 

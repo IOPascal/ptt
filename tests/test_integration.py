@@ -189,7 +189,7 @@ class IntegrationTest(unittest.TestCase):
                 "--no-discover",
                 "--cert-dir", cert_dir,
                 "--token", TOKEN,
-                "--shell", "/bin/bash",
+                "--shell", default_shell(),
                 *extra,
             ],
             stdout=subprocess.PIPE,
@@ -446,8 +446,19 @@ class IntegrationTest(unittest.TestCase):
                         seen, exit_code = echo_and_exit(sock, MARKER)
                         self.assertIn(MARKER.encode(), seen)
                         self.assertEqual(exit_code, 0)
+                        # Wait for the server-side close: it proves the
+                        # session teardown ran before we kill the host.
+                        sock.settimeout(10)
+                        try:
+                            while sock.recv(4096):
+                                pass
+                        except OSError:
+                            pass
                     finally:
                         sock.close()
+                # "N gesamt" prints after the socket closes; grace
+                # period for slow process reaping on Windows.
+                time.sleep(1)
             finally:
                 if sys.platform == "win32":
                     proc.terminate()

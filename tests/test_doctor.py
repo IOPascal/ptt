@@ -351,6 +351,7 @@ class FixTest(unittest.TestCase):
             self.assertEqual(rc, 1)
             self.assertIn("FAIL", buf.getvalue())
 
+    @unittest.skipIf(os.name == "nt", "POSIX fix path only")
     def test_symlinks_skipped(self):
         with tempfile.TemporaryDirectory() as tmp:
             home, _files = self._broken_home(tmp)

@@ -615,13 +615,18 @@ def _handle_connection(
     transfer_dir: str | None = None,
     max_transfer_size: int = 0,
     verbose: bool = False,
+    auth_timeout: float | None = None,
 ) -> bool:
     """Serve one connection. Returns True if the client authenticated.
 
     ``idle_timeout``/``max_session`` are minutes (0 disables); on timeout
     the client receives exit code 124. When ``shutdown`` is set, the
-    session ends early with a clean EXIT frame.
+    session ends early with a clean EXIT frame. ``auth_timeout`` caps
+    the pre-auth wait in seconds (None resolves AUTH_TIMEOUT late so
+    tests can patch the constant; explicit values win).
     """
+    if auth_timeout is None:
+        auth_timeout = AUTH_TIMEOUT
     ok_mark, err_mark, info_mark = ok(color), err(color), info(color)
     phase_start = time.monotonic()
     what = "Falsche PIN" if kind == "pin" else "Falsches Token"
@@ -634,7 +639,7 @@ def _handle_connection(
     else:
         peer_ip, peer_name = "?", "?"
     print(f"{ok_mark} Verbindung von {peer_name}", flush=True)
-    conn.settimeout(AUTH_TIMEOUT)
+    conn.settimeout(auth_timeout)
     try:
         try:
             given = recv_line(conn).strip()
@@ -796,6 +801,7 @@ def run_host(
     transfer_dir: str | None = None,
     max_transfer_size: int = 0,
     verbose: bool = False,
+    auth_timeout: float | None = None,
 ) -> None:
     """Open the tunnel and serve sessions until Ctrl+C (or one if ``once``).
 
@@ -804,8 +810,12 @@ def run_host(
     session inline and ignores ``max_sessions``. ``transfer_dir`` is the
     target root for file uploads (default: working directory);
     ``max_transfer_size`` caps single files in bytes (0 = unlimited).
-    ``verbose`` adds timestamped phase lines on stderr.
+    ``verbose`` adds timestamped phase lines on stderr. ``auth_timeout``
+    caps the pre-auth wait in seconds (None resolves AUTH_TIMEOUT
+    late so tests can patch the constant; explicit values win).
     """
+    if auth_timeout is None:
+        auth_timeout = AUTH_TIMEOUT
     phase_start = time.monotonic()
     _validate_shell(shell)
     if transfer_dir is not None and not os.path.isdir(transfer_dir):
@@ -902,7 +912,7 @@ def run_host(
             authed = _handle_connection(
                 wrap_conn, shell, current_secret, kind, color, failures,
                 idle_timeout, max_session, shutdown, transfer_dir,
-                max_transfer_size, verbose,
+                max_transfer_size, verbose, auth_timeout,
             )
         finally:
             try:
@@ -949,7 +959,7 @@ def run_host(
                 )
                 raw.close()
                 continue
-            raw.settimeout(AUTH_TIMEOUT)
+            raw.settimeout(auth_timeout)
             try:
                 conn = context.wrap_socket(raw, server_side=True)
                 conn.do_handshake()
@@ -973,7 +983,7 @@ def run_host(
                     authed = _handle_connection(
                         conn, shell, secret, kind, color, failures,
                         idle_timeout, max_session, shutdown, transfer_dir,
-                        max_transfer_size, verbose,
+                        max_transfer_size, verbose, auth_timeout,
                     )
                 finally:
                     try:
@@ -1003,7 +1013,7 @@ def run_host(
                     flush=True,
                 )
                 try:
-                    conn.settimeout(AUTH_TIMEOUT)
+                    conn.settimeout(auth_timeout)
                     recv_line(conn)  # discard token, else close() sends RST
                 except OSError:
                     pass

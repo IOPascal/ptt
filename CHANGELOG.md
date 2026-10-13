@@ -2,6 +2,10 @@
 
 Format: Version / Datum / Änderungen. Verhaltensänderungen sind als solche markiert.
 
+## 0.11.14
+
+- CI-Härtung Windows+Ubuntu (13 rote Windows-Tests, 1 roter Ubuntu-Test): `run_host()`/`_handle_connection()` nehmen optional `auth_timeout` (Standard weiter 30 s, keine Verhaltensänderung) — Tests nutzen 3 s, damit verwaiste Probes den Accept-Loop nicht über das Join-Limit klemmen; Late-Host-Test prüft nur noch den Vertrags-Erfolg (Windows verwirft SYN statt Refuse, erster Versuch bleibt hängen und gewinnt still); Backoff-Test nutzt echten Fail-then-Succeed-Ablauf (Peer-Key ist plattformabhängig); Exec-Session-Tests halten Peer-Seite offen (RST verwirft sonst Warteschlange auf Windows); Umlaut-Kinder mit `-X utf8`, Quiet-Test CRLF-normalisiert; Integrations-Helper nutzt `default_shell()` (Windows hat kein `/bin/bash`); Session-Zähler wartet Server-Close + Kulanz ab; Pfad-Tests mit `realpath` (8.3-Kurznamen); Symlink-Test POSIX-only; Legacy-Tests mit isolierter Known-Hosts-Datei (ephemere Port-Kollision sah wie MITM aus). Keine Verhaltensänderung.
+
 ## 0.11.13
 
 - CI-Fixes (rot auf Windows/frischen Runnern/3.9): exec-Argv immer POSIX-shlex parsen (Windows verstand POSIX-Quoting falsch, Self-Test-exec Exit 1); Fortschrittsbalken rendert Erst-Update immer (`shown=-inf` statt `0.0`, frische Boots haben kleines monotonic); Future-Import für 3.9-Annotationen in `tests/test_cert.py` plus AST-Guard; Legacy-Stub-Readiness per Event statt TCP-Probe (deterministisch) plus eigenem Junk-Toleranz-Test.

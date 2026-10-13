@@ -115,7 +115,10 @@ class RunClientErrorTest(unittest.TestCase):
             )
         self.assertIsNotNone(sock)
         sock.close()
-        self.assertIn("Versuch 1/6", buf.getvalue())
+        # No assertion on retry chatter: on some stacks (Windows
+        # loopback drops SYNs instead of refusing) the first attempt
+        # stays pending until the late listener appears and then
+        # succeeds silently. Eventual success is the contract here.
 
     def test_retry_gives_up(self):
         buf = io.StringIO()
@@ -330,6 +333,9 @@ class LoopbackMessageTest(unittest.TestCase):
                 "cert_dir": cert_dir,
                 "once": True,
                 "discover": False,
+                # Short pre-auth wait: stale probes may wedge the
+                # single-threaded accept loop until this timeout.
+                "auth_timeout": 3,
             },
             daemon=True,
         )

@@ -226,6 +226,20 @@ class TimeoutReviewTest(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, doc)
 
+    def test_auth_timeout_param_defaults_to_none(self):
+        import inspect
+
+        from ptt.host import _handle_connection, run_host
+
+        # None resolves AUTH_TIMEOUT late at call time, so patching
+        # the constant still works (see HandshakeTimeoutTest).
+        for func in (run_host, _handle_connection):
+            with self.subTest(func=func.__name__):
+                param = inspect.signature(func).parameters[
+                    "auth_timeout"
+                ]
+                self.assertIsNone(param.default)
+
 
 class SecurityReviewTest(unittest.TestCase):
     def test_rate_limit_numbers_match_docs(self):

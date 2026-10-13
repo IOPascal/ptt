@@ -109,7 +109,11 @@ class BackoffTest(unittest.TestCase):
     def test_success_resets_failures(self):
         a, b = socket.socketpair()
         try:
-            failures = {"?": [1000.0, 1001.0]}
+            # Fail once so the platform's real peer key is populated
+            # (""-derived "?" on POSIX socketpairs, "127.0.0.1" on
+            # Windows TCP socketpairs); success must clear that key.
+            failures: dict = {}
+            send_line(b, "wrong-secret")
             send_line(b, "real-secret")
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
@@ -123,13 +127,23 @@ class BackoffTest(unittest.TestCase):
                     ),
                     mock.patch("ptt.host.time.sleep") as sleep_mock,
                 ):
+                    failed = _handle_connection(
+                        a, default_shell(), "real-secret",
+                        "token", False, failures,
+                    )
+                    self.assertFalse(failed)
+                    self.assertEqual(recv_line(b).strip(), "DENIED")
+                    self.assertEqual(len(failures), 1)
+                    key = next(iter(failures))
                     result = _handle_connection(
-                        a, default_shell(), "real-secret", "token", False, failures
+                        a, default_shell(), "real-secret",
+                        "token", False, failures,
                     )
             self.assertTrue(result)
             self.assertEqual(recv_line(b).strip(), "OK")
-            sleep_mock.assert_not_called()
-            self.assertNotIn("?", failures)
+            self.assertNotIn(key, failures)
+            self.assertEqual(failures, {})
+            self.assertEqual(sleep_mock.call_count, 1)  # fail only
         finally:
             a.close()
             b.close()

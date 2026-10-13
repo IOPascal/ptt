@@ -359,13 +359,16 @@ class GetArgTest(unittest.TestCase):
 
 class TargetPathTest(unittest.TestCase):
     def test_inside(self):
+        # realpath both sides: _target_path resolves symlinks, and on
+        # Windows the temp root may use 8.3 short names (RUNNER~1).
         with tempfile.TemporaryDirectory() as root:
             self.assertEqual(
-                _target_path(root, "f.txt"), os.path.join(root, "f.txt")
+                _target_path(root, "f.txt"),
+                os.path.realpath(os.path.join(root, "f.txt")),
             )
             self.assertEqual(
                 _target_path(root, "sub/dir/f"),
-                os.path.join(root, "sub", "dir", "f"),
+                os.path.realpath(os.path.join(root, "sub", "dir", "f")),
             )
 
     def test_escape_rejected(self):
@@ -423,7 +426,7 @@ class TargetPathTest(unittest.TestCase):
                     self.assertIsNone(_target_path(root, bad))
             self.assertEqual(
                 _target_path(root, "sub\\ok.txt"),
-                os.path.join(root, "sub\\ok.txt"),
+                os.path.realpath(os.path.join(root, "sub\\ok.txt")),
             )
 
 

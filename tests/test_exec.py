@@ -164,7 +164,9 @@ class ServeExecTest(unittest.TestCase):
 
     def test_umlaut_output(self):
         out, code, _res = self._run(
-            [sys.executable, "-c", "print('Grüße')"]
+            # -X utf8: without it the child uses the console
+            # codepage (cp1252) on Windows instead of UTF-8.
+            [sys.executable, "-X", "utf8", "-c", "print('Grüße')"]
         )
         self.assertEqual(code, 0)
         self.assertIn("Grüße".encode("utf-8"), out)
@@ -262,11 +264,14 @@ class ExecSessionTest(unittest.TestCase):
         try:
             send_frame(b, FRAME_STDOUT, "Grüße".encode("utf-8"))
             send_frame(b, FRAME_EXIT, struct.pack("!i", 5))
-            b.close()
+            # Keep b open: the session's stdin forwarder writes to a,
+            # and closing b first turns that write into an RST that
+            # discards queued data on Windows (reader sees abort/1).
             with self._captured_stdout() as raw, self._empty_stdin():
                 code = _run_exec_session(a, False)
         finally:
             a.close()
+            b.close()
         self.assertEqual(code, 5)
         self.assertIn("Grüße".encode("utf-8"), raw.getvalue())
 
@@ -299,12 +304,15 @@ class ExecSessionTest(unittest.TestCase):
         try:
             send_frame(b, FRAME_STDOUT, b"payload-x")
             send_frame(b, FRAME_EXIT, struct.pack("!i", 0))
-            b.close()
+            # Keep b open during the session (see above): closing it
+            # first makes the stdin forwarder's write raise RST and
+            # the session abort with 1 on Windows TCP socketpairs.
             payload = io.BytesIO()
             with self._captured_stdout() as raw, self._empty_stdin():
                 code = _run_exec_session(a, False, _out=payload)
         finally:
             a.close()
+            b.close()
         self.assertEqual(code, 0)
         self.assertEqual(payload.getvalue(), b"payload-x")
         self.assertEqual(raw.getvalue(), b"")
@@ -474,7 +482,11 @@ class ExecLoopbackTest(unittest.TestCase):
         self.assertEqual(code, 3)
 
     def test_umlauts(self):
-        code, out = self._exec([sys.executable, "-c", "print('Grüße')"])
+        code, out = self._exec(
+            # -X utf8: without it the child uses the console
+            # codepage (cp1252) on Windows instead of UTF-8.
+            [sys.executable, "-X", "utf8", "-c", "print('Grüße')"]
+        )
         self.assertEqual(code, 0)
         self.assertIn("Grüße".encode("utf-8"), out)
 
@@ -494,7 +506,9 @@ class ExecLoopbackTest(unittest.TestCase):
             [sys.executable, "-c", "print('quiet-ok')"], quiet=True
         )
         self.assertEqual(code, 0)
-        self.assertEqual(out, "quiet-ok\n".encode("utf-8"))
+        # The child prints os.linesep (CRLF on Windows); payload
+        # equality is about bytes except that translation.
+        self.assertEqual(out.replace(b"\r\n", b"\n"), b"quiet-ok\n")
         self.assertIn("Verbinde mit", err)
 
     def test_quiet_denied_goes_to_stderr(self):
