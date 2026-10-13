@@ -30,6 +30,14 @@ jobs:
       - name: Syntax check
         run: python -m compileall -q ptt tests
 
+      - name: Check package metadata resolves
+        run: |
+          pip install "setuptools>=77"
+          python -c "import tempfile; from setuptools.build_meta import prepare_metadata_for_build_wheel as m; from ptt import __version__; n = m(tempfile.mkdtemp()); assert n.endswith(__version__ + '.dist-info'), n; print('metadata ok:', n)"
+
+      - name: Doctor self-test (live loopback)
+        run: python -m ptt doctor --self-test
+
       - name: Smoke-test starter script (Linux/macOS)
         if: runner.os != 'Windows'
         run: ./ptt.sh --version

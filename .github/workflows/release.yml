@@ -21,6 +21,12 @@ jobs:
       - name: Install build backend
         run: pip install build
 
+      - name: Check tag matches version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VER="v$(python -c 'from ptt import __version__; print(__version__)')"
+          test "$TAG" = "$VER" || { echo "Tag $TAG != Version $VER"; exit 1; }
+
       - name: Run tests
         run: python -m unittest discover -s tests
 
