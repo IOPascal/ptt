@@ -2,6 +2,10 @@
 
 Format: Version / Datum / Änderungen. Verhaltensänderungen sind als solche markiert.
 
+## 0.11.12
+
+- CI-Fix: `License :: ...`-Classifier entfernt (setuptools≥77 verbietet ihn neben SPDX-`license`). Keine Verhaltensänderung.
+
 ## 0.11.11
 
 - CI-Fix: `pyproject.toml` nutzt SPDX-String `license = "EUPL-1.2"` (setuptools≥77 lehnt die `{text=...}`-Form ab — CI war rot). Keine Verhaltensänderung.
