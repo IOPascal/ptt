@@ -2,6 +2,10 @@
 
 Format: Version / Datum / Änderungen. Verhaltensänderungen sind als solche markiert.
 
+## 0.11.11
+
+- CI-Fix: `pyproject.toml` nutzt SPDX-String `license = "EUPL-1.2"` (setuptools≥77 lehnt die `{text=...}`-Form ab — CI war rot). Keine Verhaltensänderung.
+
 ## 0.11.10
 
 - Abschluss Linie 0.11.x Release-Reife und des Gesamtpakets: Dogfood-Runde grün (Host/Client mit exec/put/get/Batch/scan, Diagnose, reset-Vorschau). Hinweis: `~/.ptt`-Rechte in Sandbox-Umgebungen ggf. einmalig außerhalb per `ptt doctor --fix` korrigieren.

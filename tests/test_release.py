@@ -45,7 +45,7 @@ class LicenseAppliedTest(unittest.TestCase):
 
     def test_pyproject_declares_eupl(self):
         pyproject = _read("pyproject.toml")
-        self.assertIn('license = { text = "EUPL-1.2" }', pyproject)
+        self.assertIn('license = "EUPL-1.2"', pyproject)
         self.assertIn(
             "European Union Public Licence 1.2 (EUPL 1.2)", pyproject
         )
@@ -255,7 +255,7 @@ class SecurityReviewTest(unittest.TestCase):
 class UpgradePathTest(unittest.TestCase):
     def test_finale_changelog_covers_release_line(self):
         changelog = _read("CHANGELOG.md")
-        for minor in range(11):
+        for minor in range(12):
             version = f"0.11.{minor}"
             with self.subTest(version=version):
                 self.assertIn(f"## {version}", changelog)
