@@ -56,6 +56,9 @@ class IntegrationTest(unittest.TestCase):
             "cert_dir": cert_dir,
             "once": True,
             "discover": False,
+            # Short pre-auth wait so stale probes cannot wedge the
+            # accept loop past the test joins (Windows loopback).
+            "auth_timeout": 3,
         }
         kwargs.update(extra)
         thread = threading.Thread(target=run_host, kwargs=kwargs, daemon=True)
@@ -913,7 +916,18 @@ class IntegrationTest(unittest.TestCase):
                     try:
                         wait_for_port(port)
                         buf = io.StringIO()
-                        with contextlib.redirect_stdout(buf):
+                        with (
+                            contextlib.redirect_stdout(buf),
+                            # Isolated TOFU: ephemeral ports repeat
+                            # across the suite (foreign fingerprint
+                            # for a reused port = false MITM alarm).
+                            mock.patch(
+                                "ptt.known_hosts.known_hosts_path",
+                                return_value=os.path.join(
+                                    work, "known_hosts"
+                                ),
+                            ),
+                        ):
                             rc = run_client(
                                 "127.0.0.1", port, TOKEN,
                                 put=[file_a, file_b],
@@ -954,7 +968,16 @@ class IntegrationTest(unittest.TestCase):
                     try:
                         wait_for_port(port)
                         buf = io.StringIO()
-                        with contextlib.redirect_stdout(buf):
+                        with (
+                            contextlib.redirect_stdout(buf),
+                            # Isolated TOFU (see batch test above).
+                            mock.patch(
+                                "ptt.known_hosts.known_hosts_path",
+                                return_value=os.path.join(
+                                    work, "known_hosts"
+                                ),
+                            ),
+                        ):
                             rc = run_client(
                                 "127.0.0.1", port, TOKEN,
                                 put=[file_a],

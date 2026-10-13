@@ -102,6 +102,7 @@ class HealthCheckLoopbackTest(unittest.TestCase):
                     "cert_dir": cert_dir,
                     "once": True,
                     "discover": False,
+                    "auth_timeout": 3,
                 },
                 daemon=True,
             )

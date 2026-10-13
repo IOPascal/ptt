@@ -832,6 +832,9 @@ def _self_test_host(
             "color_mode": "never",
             "discover": False,
             "transfer_dir": transfer_dir,
+            # Fail stale probes fast: lingering daemons would
+            # otherwise hold ports across self-test steps.
+            "auth_timeout": 3,
         },
         daemon=True,
     )

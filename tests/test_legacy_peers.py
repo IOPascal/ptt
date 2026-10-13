@@ -178,8 +178,11 @@ class LegacyPeerTest(unittest.TestCase):
         finally:
             wrapper.flush()
             sys.stdout = old
-        self.assertEqual(rc, 124)
-        self.assertIn("Zeitlimit", raw.getvalue().decode("utf-8"))
+        # Dump the client output on failure: CI-only flakes need the
+        # actual client words for diagnosis (rc alone says nothing).
+        out = raw.getvalue().decode("utf-8", "replace")
+        self.assertEqual(rc, 124, f"rc={rc} out={out!r}")
+        self.assertIn("Zeitlimit", out, f"rc={rc} out={out!r}")
         self.assertLess(elapsed, 8)
 
     def test_put_without_alpn_is_clean(self):

@@ -2,6 +2,10 @@
 
 Format: Version / Datum / Änderungen. Verhaltensänderungen sind als solche markiert.
 
+## 0.11.15
+
+- CI-Härtung Runde 2 (Windows 3.10/3.12, Ubuntu-Legacy): TOFU-Isolation in allen Test-Client-Pfaden (`_exec_streams`, Batch-Tests) — wiederverwendete ephemere Ports mit fremdem Fingerabdruck sahen wie MITM aus (flaky Exit 1, Opfer wechselten je nach Port-Reihenfolge); `auth_timeout=3` an allen In-Thread-Test-Hosts und Self-Test-Hosts (verwaiste Daemons hielten sonst Ports über Steps hinweg); Diagnose-Asserts dumpen Client-Output (Legacy-Timeout) bzw. Step-Name (Self-Test) bei Fehlschlag. Keine Verhaltensänderung.
+
 ## 0.11.14
 
 - CI-Härtung Windows+Ubuntu (13 rote Windows-Tests, 1 roter Ubuntu-Test): `run_host()`/`_handle_connection()` nehmen optional `auth_timeout` (Standard weiter 30 s, keine Verhaltensänderung) — Tests nutzen 3 s, damit verwaiste Probes den Accept-Loop nicht über das Join-Limit klemmen; Late-Host-Test prüft nur noch den Vertrags-Erfolg (Windows verwirft SYN statt Refuse, erster Versuch bleibt hängen und gewinnt still); Backoff-Test nutzt echten Fail-then-Succeed-Ablauf (Peer-Key ist plattformabhängig); Exec-Session-Tests halten Peer-Seite offen (RST verwirft sonst Warteschlange auf Windows); Umlaut-Kinder mit `-X utf8`, Quiet-Test CRLF-normalisiert; Integrations-Helper nutzt `default_shell()` (Windows hat kein `/bin/bash`); Session-Zähler wartet Server-Close + Kulanz ab; Pfad-Tests mit `realpath` (8.3-Kurznamen); Symlink-Test POSIX-only; Legacy-Tests mit isolierter Known-Hosts-Datei (ephemere Port-Kollision sah wie MITM aus). Keine Verhaltensänderung.

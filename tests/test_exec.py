@@ -418,6 +418,9 @@ class ExecLoopbackTest(unittest.TestCase):
                 "cert_dir": cert_dir,
                 "once": True,
                 "discover": False,
+                # Short pre-auth wait so stale probes cannot wedge
+                # the accept loop past the join below (Windows).
+                "auth_timeout": 3,
             },
             daemon=True,
         )
@@ -455,6 +458,13 @@ class ExecLoopbackTest(unittest.TestCase):
             with (
                 mock.patch.object(sys, "stdin", fake_stdin),
                 contextlib.redirect_stderr(err_buf),
+                # Isolated TOFU: ephemeral ports repeat across the
+                # suite, and a foreign fingerprint for a reused port
+                # would look like a MITM attack (flaky rc 1).
+                mock.patch(
+                    "ptt.known_hosts.known_hosts_path",
+                    return_value=os.path.join(cert_dir, "known_hosts"),
+                ),
             ):
                 try:
                     code = run_exec(

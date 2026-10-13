@@ -799,10 +799,11 @@ class SelfTestLiveTest(unittest.TestCase):
             ["self-cert", "self-exec", "self-put", "self-get"],
         )
         for row in rows:
-            self.assertEqual(row["status"], "OK")
-            self.assertTrue(row["title"])
-            self.assertTrue(row["message"])
-            self.assertIn("hint", row)
+            where = f"{row['id']}: {row['message']}"
+            self.assertEqual(row["status"], "OK", where)
+            self.assertTrue(row["title"], where)
+            self.assertTrue(row["message"], where)
+            self.assertIn("hint", row, where)
 
 
 class CheckFilterTest(unittest.TestCase):
